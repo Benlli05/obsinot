@@ -1,6 +1,6 @@
 # [NOMBRE] — Diseño técnico del MVP (propuesta para aprobación)
 
-Estado: **BORRADOR — pendiente de aprobación**. No hay código de aplicación aún.
+Estado: decisiones D1–D6 **aprobadas** (ver §5). Cambio de foco pendiente de definir (ver §7). No hay código de aplicación aún.
 
 ---
 
@@ -265,12 +265,14 @@ Un aporte reemplazado queda visible en el historial pero marcado “reemplazado�
 
 ## 5. Decisiones que necesito que confirmes
 
-- **D1 Patentes de motos** (`AA123`, `ABC12`): ¿solo autos en el MVP o aceptar también motos?
-- **D2 Descuento de inventario:** propongo descontar stock al pasar la OT a `entregado`, por los repuestos de presupuestos aprobados vinculados a inventario. Alternativa: al aprobar el presupuesto.
-- **D3 Anti-manipulación de validaciones:** propongo que solo cuenten para “confirmado por N” los votos de talleres **verificados por un moderador** (RUT revisado). Sin esto, una persona crea 3 talleres y “confirma” su propio dato.
-- **D4 Umbral** para mostrar “confirmado”: propongo N ≥ 2 talleres; con N = 1 se muestra “1 taller confirma” pero con la advertencia de no verificado.
-- **D5 IVA:** precios se ingresan netos y el presupuesto muestra neto + IVA 19% + total. ¿O tus clientes esperan precios con IVA incluido?
-- **D6 Registro de talleres:** ¿autoregistro abierto o solo por invitación tuya en el MVP?
+Resueltas:
+
+- **D1** Se aceptan patentes de auto (`AA1234`, `BCDF12`) **y de moto** (`AA123`, `BCD12`). El CHECK de `vehiculos.patente` se amplía y se agrega `vehiculos.tipo enum('auto','moto')`.
+- **D2** El stock se descuenta al pasar la OT a `entregado`, por los ítems de repuesto de presupuestos aprobados.
+- **D3** Solo cuentan para “confirmado por N” los votos de talleres con `verificado_en` no nulo.
+- **D4** “Confirmado” requiere N ≥ 2 talleres verificados distintos del autor.
+- **D5** Precios netos; el presupuesto muestra neto + IVA 19% + total.
+- **D6** Registro de talleres solo por invitación (token de un solo uso emitido por un administrador de la plataforma).
 
 ## 6. Tests multi-tenant planificados
 
@@ -284,3 +286,31 @@ Con dos talleres (A y B) y usuarios de cada uno, contra Postgres real con RLS:
 - Un mecánico de A no puede acceder a archivos (fotos) de B por URL directa.
 - Un moderador sin membresía no ve datos de ningún taller.
 - Base técnica: un taller no puede confirmar dos veces el mismo aporte ni confirmar el propio.
+
+---
+
+## 7. Fuentes de diagramas y datos técnicos (cambio de foco)
+
+Requisito nuevo: el centro de la app es **buscar diagramas reales de vehículos para repararlos**.
+
+### 7.1 Lo que no se puede hacer
+
+- No existe una base abierta y legal de diagramas eléctricos/procedimientos de taller de “todos los vehículos”. Los diagramas son obra protegida del fabricante; los que existen en bases comerciales están **licenciados** a los fabricantes.
+- Descargar, raspar (scraping) o redistribuir diagramas de sitios de manuales o de suscripciones personales infringe derechos de autor y los términos de esos servicios. Queda fuera del proyecto.
+- La app **no generará** diagramas ni datos técnicos (restricción original, se mantiene).
+
+### 7.2 Fuentes legítimas
+
+| Fuente | Qué entrega | Integración | Observaciones |
+|---|---|---|---|
+| TecAlliance **TecRMI** | Manuales de reparación, diagramas eléctricos, ubicación de componentes, fusibles/relés, DTC, planes de mantención | Web service/API para software de terceros, o TecRMI Online | Pensado para proveedores de software de taller. Cobertura de marcas chinas: **por confirmar con el proveedor**. |
+| **Autodata** (Solera) | Diagramas eléctricos, procedimientos, pinouts de ECU, datos de mantención | API comercial (developer.autodata-group.com); ya integrada en softwares de gestión de taller | La brecha de cobertura china es justamente el problema de origen. |
+| **HaynesPro** WorkshopData | Diagramas eléctricos interactivos, datos de reparación, tiempos | Licenciamiento B2B a distribuidores/redes | Fuerte en Europa; cobertura china por confirmar. |
+| Importadores/representantes de marca en Chile | Manuales de servicio oficiales | Convenio directo | Única vía realista para ciertas marcas chinas si los agregadores no las cubren. |
+| NHTSA **vPIC** | Solo catálogo: marcas, modelos, decodificación VIN | API gratuita, sin clave, uso comercial permitido | **No** contiene diagramas. Útil para el catálogo y para decodificar VIN. |
+
+### 7.3 Impacto en la arquitectura
+
+- Nueva interfaz `ProveedorInfoTecnica` (misma idea que `ProveedorDTE`): `buscarVehiculo(vin | marca/modelo/año/motor)`, `listarDiagramas(vehiculo)`, `obtenerDiagrama(id)`. La UI muestra los diagramas **dentro de la app sin almacenarlos**, según lo que permita cada contrato.
+- La base colaborativa (módulo 2) pasa a ser el **complemento** para las marcas o casos que el proveedor licenciado no cubre, y agrega el tipo de aporte `diagrama`: solo diagramas **dibujados o medidos por el propio mecánico** (con declaración de autoría). No se aceptan escaneos de manuales.
+- Cada resultado indica su origen: “Proveedor licenciado (X)” o “Aporte de la comunidad — nivel de validación”.
